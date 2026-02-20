@@ -12,7 +12,8 @@ app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['OUTPUT_FOLDER'] = 'outputs'
 app.config['SCENE_FOLDER'] = 'scenes'
-app.config['MAX_CONTENT_LENGTH'] = 150 * 1024 * 1024  # 150MB limit
+app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB limit
+#app.config['MAX_CONTENT_LENGTH'] = 150 * 1024 * 1024  # 150MB limit
 
 for folder in [app.config['UPLOAD_FOLDER'], app.config['OUTPUT_FOLDER'], app.config['SCENE_FOLDER']]:
     os.makedirs(folder, exist_ok=True)
