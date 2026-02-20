@@ -8,6 +8,8 @@
     <style>
         body { padding: 20px; }
         .result { margin-top: 20px; }
+        .metric { font-size: 1.1em; margin-bottom: 5px; }
+        .metric span { font-weight: bold; }
     </style>
 </head>
 <body>
@@ -24,6 +26,7 @@
                         <div class="col-md-4 mb-3">
                             <label for="crf" class="form-label">CRF (0–51, lower = better quality)</label>
                             <input type="number" class="form-control" id="crf" name="crf" value="23" min="0" max="51">
+                            <small class="form-text text-muted">Recommended: 23 (good), 28 (balanced), 30+ (smaller)</small>
                         </div>
                         <div class="col-md-4 mb-3">
                             <label for="preset" class="form-label">Preset</label>
@@ -61,9 +64,11 @@
         <div class="result card mt-4" style="display: none;">
             <div class="card-header">Encoding Result</div>
             <div class="card-body">
-                <p>Original size: <span id="origSize"></span></p>
-                <p>Compressed size: <span id="compSize"></span></p>
-                <p>Space savings: <span id="savings"></span>%</p>
+                <p class="metric">Original size: <span id="origSize"></span></p>
+                <p class="metric">Compressed size: <span id="compSize"></span></p>
+                <p class="metric">Space savings: <span id="savings"></span>%</p>
+                <p class="metric">PSNR: <span id="psnr"></span> dB (higher is better)</p>
+                <p class="metric">SSIM: <span id="ssim"></span> (1.0 = identical)</p>
                 <a href="#" id="downloadLink" class="btn btn-success">Download Compressed Video</a>
             </div>
         </div>
@@ -92,6 +97,8 @@
                     document.getElementById('compSize').innerText = (data.compressed_size / 1024 / 1024).toFixed(2) + ' MB';
                     document.getElementById('savings').innerText = data.savings_percent;
                     document.getElementById('downloadLink').href = data.download_url;
+                    if (data.psnr) document.getElementById('psnr').innerText = data.psnr;
+                    if (data.ssim) document.getElementById('ssim').innerText = data.ssim;
                     resultDiv.style.display = 'block';
                 } else {
                     alert('Error: ' + data.error);
