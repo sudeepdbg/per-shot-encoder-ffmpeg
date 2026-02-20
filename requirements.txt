@@ -1,0 +1,4 @@
+flask
+scenedetect
+opencv-python-headless
+gunicorn
