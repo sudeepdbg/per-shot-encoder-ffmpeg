@@ -11,9 +11,10 @@ from scenedetect import VideoManager, SceneManager
 from scenedetect.detectors import ContentDetector
 
 app = Flask(__name__)
-app.config['UPLOAD_FOLDER'] = 'uploads'
-app.config['OUTPUT_FOLDER'] = 'outputs'
-app.config['SCENE_FOLDER'] = 'scenes'
+app.config['BASE_DIR'] = os.path.dirname(os.path.abspath(__file__))
+app.config['UPLOAD_FOLDER'] = os.path.join(app.config['BASE_DIR'], 'uploads')
+app.config['OUTPUT_FOLDER'] = os.path.join(app.config['BASE_DIR'], 'outputs')
+app.config['SCENE_FOLDER'] = os.path.join(app.config['BASE_DIR'], 'scenes')
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB limit (PythonAnywhere free tier)
 
 for folder in [app.config['UPLOAD_FOLDER'], app.config['OUTPUT_FOLDER'], app.config['SCENE_FOLDER']]:
@@ -23,6 +24,21 @@ ALLOWED_EXTENSIONS = {'mp4', 'avi', 'mov', 'mkv'}
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def cleanup_old_files(max_age=3600):
+    """Delete files older than max_age seconds from uploads, outputs, and scenes folders."""
+    now = time.time()
+    for folder in [app.config['UPLOAD_FOLDER'], app.config['OUTPUT_FOLDER'], app.config['SCENE_FOLDER']]:
+        for filename in os.listdir(folder):
+            file_path = os.path.join(folder, filename)
+            if os.path.isfile(file_path):
+                file_age = now - os.path.getmtime(file_path)
+                if file_age > max_age:
+                    try:
+                        os.remove(file_path)
+                        print(f"Auto‑cleaned old file: {file_path}")
+                    except Exception as e:
+                        print(f"Cleanup error for {file_path}: {e}")
 
 def detect_scenes(video_path, threshold=30.0):
     video_manager = VideoManager([video_path])
@@ -165,6 +181,9 @@ def index():
 
 @app.route('/encode', methods=['POST'])
 def encode():
+    # Auto‑cleanup old files before processing new request
+    cleanup_old_files()
+
     if 'file' not in request.files:
         return jsonify({'error': 'No file uploaded'}), 400
     file = request.files['file']
