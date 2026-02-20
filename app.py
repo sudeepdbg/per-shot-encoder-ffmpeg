@@ -63,8 +63,41 @@ def concatenate_scenes(scene_files, output_path):
     ]
     subprocess.run(cmd, check=True, capture_output=True)
 
+def calculate_metrics(original, compressed):
+    """Calculate PSNR and SSIM between two videos. Returns (psnr, ssim) or (None, None) on error."""
+    psnr = ssim = None
+    try:
+        # PSNR
+        cmd_psnr = ['ffmpeg', '-i', original, '-i', compressed, '-lavfi', 'psnr', '-f', 'null', '-']
+        result = subprocess.run(cmd_psnr, capture_output=True, text=True, timeout=120)
+        for line in result.stderr.split('\n'):
+            if 'PSNR' in line and 'average:' in line:
+                parts = line.split()
+                for p in parts:
+                    if p.startswith('average:'):
+                        psnr = float(p.split(':')[1])
+                        break
+                break
+
+        # SSIM
+        cmd_ssim = ['ffmpeg', '-i', original, '-i', compressed, '-lavfi', 'ssim', '-f', 'null', '-']
+        result = subprocess.run(cmd_ssim, capture_output=True, text=True, timeout=120)
+        for line in result.stderr.split('\n'):
+            if 'SSIM' in line and 'All:' in line:
+                parts = line.split()
+                for p in parts:
+                    if p.startswith('All:'):
+                        ssim_str = p.split(':')[1]
+                        if '(' in ssim_str:
+                            ssim_str = ssim_str.split('(')[0]
+                        ssim = float(ssim_str)
+                        break
+                break
+    except Exception as e:
+        print(f"Metric calculation error: {e}")
+    return psnr, ssim
+
 def delayed_cleanup(file_path, delay=5):
-    """Delete a file after a short delay."""
     def delete():
         time.sleep(delay)
         try:
@@ -88,7 +121,6 @@ def encode():
     if not allowed_file(file.filename):
         return jsonify({'error': 'File type not allowed'}), 400
 
-    # Save uploaded file
     filename = secure_filename(file.filename)
     input_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{uuid.uuid4()}_{filename}")
     file.save(input_path)
@@ -129,7 +161,9 @@ def encode():
         comp_size = os.path.getsize(output_path)
         savings = (1 - comp_size / orig_size) * 100 if orig_size > 0 else 0
 
-        # Return download URL and file info
+        # Calculate quality metrics
+        psnr, ssim = calculate_metrics(input_path, output_path)
+
         download_url = f'/download/{output_filename}?input_id={os.path.basename(input_path)}&output_id={output_filename}'
 
         return jsonify({
@@ -137,11 +171,12 @@ def encode():
             'download_url': download_url,
             'original_size': orig_size,
             'compressed_size': comp_size,
-            'savings_percent': round(savings, 2)
+            'savings_percent': round(savings, 2),
+            'psnr': round(psnr, 2) if psnr else None,
+            'ssim': round(ssim, 3) if ssim else None
         })
 
     except Exception as e:
-        # Clean up input file on error
         if os.path.exists(input_path):
             os.remove(input_path)
         return jsonify({'error': str(e)}), 500
@@ -157,7 +192,6 @@ def download(filename):
 
     @after_this_request
     def cleanup(response):
-        # Schedule deletion of both input and output files
         if input_id:
             input_path = os.path.join(app.config['UPLOAD_FOLDER'], input_id)
             delayed_cleanup(input_path)
