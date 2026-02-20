@@ -21,7 +21,7 @@
                     <div class="mb-3">
                         <label for="videoFile" class="form-label">Select video</label>
                         <input class="form-control" type="file" id="videoFile" name="file" accept="video/*" required>
-                        <small class="text-muted">Max file size: 50 MB (free tier limit)</small>
+                        <small class="form-text text-muted">Max file size: 50 MB (free tier limit)</small>
                     </div>
                     <div class="row">
                         <div class="col-md-4 mb-3">
@@ -58,6 +58,16 @@
                 </form>
                 <div class="progress mt-3" style="display: none;">
                     <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 100%">Processing...</div>
+                </div>
+
+                <!-- Free tier notice -->
+                <div class="alert alert-warning mt-3" role="alert">
+                    <strong>Note:</strong> This is a free demo hosted on PythonAnywhere.
+                    <ul class="mb-0 mt-2">
+                        <li>Maximum file size: <strong>50 MB</strong>.</li>
+                        <li>Processing may take a few minutes – please be patient.</li>
+                        <li>During high traffic, you might see a 503 error; if that happens, try again later.</li>
+                    </ul>
                 </div>
             </div>
         </div>
