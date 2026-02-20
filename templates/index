@@ -1,0 +1,7 @@
+<div class="col-md-4 mb-3">
+    <label for="crf" class="form-label">CRF (0–51, lower = better quality)</label>
+    <input type="number" class="form-control" id="crf" name="crf" value="23" min="0" max="51">
+    <small class="form-text text-muted">
+        Recommended: 23 (good quality), 28 (balanced), 30+ (smaller file)
+    </small>
+</div>
