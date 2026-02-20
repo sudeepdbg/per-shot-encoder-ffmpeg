@@ -1,6 +1,6 @@
 Proof of Concept (PoC) for Content-Adaptive Encoding (CAE). This tool leverages AI-driven scene detection to dynamically optimize FFmpeg encoding parameters on a per-shot basis, maximizing storage savings without compromising visual fidelity.
 
-🚀 Live Demo
+🚀 Live Demo https://sudeepdbg.pythonanywhere.com/
 (Note: Public demo is capped at 50MB per upload)
 
 📖 Overview
