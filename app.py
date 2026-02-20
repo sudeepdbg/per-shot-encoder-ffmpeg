@@ -36,15 +36,20 @@ def detect_scenes(video_path, threshold=30.0):
     return [(start.get_seconds(), end.get_seconds()) for start, end in scene_list]
 
 def encode_scene(input_path, output_path, start, end, base_crf, preset):
-    """Encode a single scene with safe handling of None end and error logging."""
+    """Encode a single scene with robust seeking and error fallback."""
     if end is None:
-        duration = None
-        end_str = None
+        # No end time – encode until the end of the video
         print(f"Scene {start:.1f}-end (full remainder) using base CRF {base_crf}")
         crf = base_crf
+        cmd = [
+            'ffmpeg', '-y', '-i', input_path, '-ss', str(start),
+            '-c:v', 'libx264', '-crf', str(crf), '-preset', preset,
+            '-c:a', 'aac', '-avoid_negative_ts', 'make_zero',
+            '-fflags', '+genpts', output_path
+        ]
     else:
         duration = end - start
-        end_str = str(end)
+        # Adjust CRF based on duration (simple heuristic)
         if duration > 10:
             crf = base_crf + 4
         elif duration > 5:
@@ -54,18 +59,46 @@ def encode_scene(input_path, output_path, start, end, base_crf, preset):
         crf = max(18, min(35, crf))
         print(f"Scene {start:.1f}-{end:.1f} (dur={duration:.1f}s) using CRF {crf}")
 
-    cmd = ['ffmpeg', '-y', '-i', input_path, '-ss', str(start)]
-    if end_str:
-        cmd.extend(['-to', end_str])
-    cmd.extend(['-c:v', 'libx264', '-crf', str(crf), '-preset', preset, '-c:a', 'aac', output_path])
+        # Primary command: accurate seek (ss after -i) with duration
+        cmd = [
+            'ffmpeg', '-y', '-i', input_path, '-ss', str(start),
+            '-t', str(duration), '-c:v', 'libx264', '-crf', str(crf),
+            '-preset', preset, '-c:a', 'aac', '-avoid_negative_ts', 'make_zero',
+            '-fflags', '+genpts', output_path
+        ]
 
     try:
         subprocess.run(cmd, check=True, capture_output=True, text=True)
     except subprocess.CalledProcessError as e:
-        print(f"!!! FFmpeg error for scene {start}-{end} !!!")
+        print(f"!!! FFmpeg error for scene {start}-{end} (accurate seek) !!!")
         print(f"Command: {' '.join(cmd)}")
         print(f"FFmpeg stderr:\n{e.stderr}")
-        raise
+
+        # Fallback: try fast seek (ss before -i) – may work where accurate seek fails
+        print("Attempting fallback with fast seek...")
+        if end is None:
+            cmd_fallback = [
+                'ffmpeg', '-y', '-ss', str(start), '-i', input_path,
+                '-c:v', 'libx264', '-crf', str(crf), '-preset', preset,
+                '-c:a', 'aac', '-avoid_negative_ts', 'make_zero',
+                '-fflags', '+genpts', output_path
+            ]
+        else:
+            cmd_fallback = [
+                'ffmpeg', '-y', '-ss', str(start), '-i', input_path,
+                '-t', str(duration), '-c:v', 'libx264', '-crf', str(crf),
+                '-preset', preset, '-c:a', 'aac', '-avoid_negative_ts', 'make_zero',
+                '-fflags', '+genpts', output_path
+            ]
+        try:
+            subprocess.run(cmd_fallback, check=True, capture_output=True, text=True)
+            print("Fallback succeeded.")
+            return
+        except subprocess.CalledProcessError as e2:
+            print("!!! Fallback also failed !!!")
+            print(f"Command: {' '.join(cmd_fallback)}")
+            print(f"FFmpeg stderr:\n{e2.stderr}")
+            raise  # Re-raise the original exception (or e2) to stop processing
 
 def concatenate_scenes(scene_files, output_path):
     concat_list = os.path.join(app.config['SCENE_FOLDER'], 'concat_list.txt')
