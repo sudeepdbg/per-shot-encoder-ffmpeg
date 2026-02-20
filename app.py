@@ -36,17 +36,15 @@ def detect_scenes(video_path, threshold=30.0):
     return [(start.get_seconds(), end.get_seconds()) for start, end in scene_list]
 
 def encode_scene(input_path, output_path, start, end, base_crf, preset):
-    """Encode a single scene with safe handling of None end."""
+    """Encode a single scene with safe handling of None end and error logging."""
     if end is None:
-        # No end time – encode until the end of the video
         duration = None
         end_str = None
         print(f"Scene {start:.1f}-end (full remainder) using base CRF {base_crf}")
-        crf = base_crf  # no adjustment
+        crf = base_crf
     else:
         duration = end - start
         end_str = str(end)
-        # Adjust CRF based on duration
         if duration > 10:
             crf = base_crf + 4
         elif duration > 5:
@@ -56,13 +54,18 @@ def encode_scene(input_path, output_path, start, end, base_crf, preset):
         crf = max(18, min(35, crf))
         print(f"Scene {start:.1f}-{end:.1f} (dur={duration:.1f}s) using CRF {crf}")
 
-    # Build ffmpeg command
     cmd = ['ffmpeg', '-y', '-i', input_path, '-ss', str(start)]
     if end_str:
         cmd.extend(['-to', end_str])
     cmd.extend(['-c:v', 'libx264', '-crf', str(crf), '-preset', preset, '-c:a', 'aac', output_path])
 
-    subprocess.run(cmd, check=True, capture_output=True)
+    try:
+        subprocess.run(cmd, check=True, capture_output=True, text=True)
+    except subprocess.CalledProcessError as e:
+        print(f"!!! FFmpeg error for scene {start}-{end} !!!")
+        print(f"Command: {' '.join(cmd)}")
+        print(f"FFmpeg stderr:\n{e.stderr}")
+        raise
 
 def concatenate_scenes(scene_files, output_path):
     concat_list = os.path.join(app.config['SCENE_FOLDER'], 'concat_list.txt')
@@ -73,7 +76,13 @@ def concatenate_scenes(scene_files, output_path):
         'ffmpeg', '-y', '-f', 'concat', '-safe', '0',
         '-i', concat_list, '-c', 'copy', output_path
     ]
-    subprocess.run(cmd, check=True, capture_output=True)
+    try:
+        subprocess.run(cmd, check=True, capture_output=True, text=True)
+    except subprocess.CalledProcessError as e:
+        print("!!! Concatenation failed !!!")
+        print(f"Command: {' '.join(cmd)}")
+        print(f"FFmpeg stderr:\n{e.stderr}")
+        raise
 
 def calculate_metrics(original, compressed):
     """Calculate PSNR and SSIM with robust parsing."""
@@ -170,7 +179,13 @@ def encode():
             if resolution:
                 cmd.extend(['-vf', f'scale={resolution}'])
             cmd.extend(['-c:a', 'aac', output_path])
-            subprocess.run(cmd, check=True, capture_output=True)
+            try:
+                subprocess.run(cmd, check=True, capture_output=True, text=True)
+            except subprocess.CalledProcessError as e:
+                print("!!! Normal encoding failed !!!")
+                print(f"Command: {' '.join(cmd)}")
+                print(f"FFmpeg stderr:\n{e.stderr}")
+                raise
 
         orig_size = os.path.getsize(input_path)
         comp_size = os.path.getsize(output_path)
